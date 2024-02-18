@@ -1,28 +1,29 @@
 const jwt = require("jsonwebtoken");
-User = require("../models/user");
+const User = require("../models/user");
 
-const verifyToken = (req, res, next) => {
-  if (req.headers && req.headers.authorization && req.headers.authorization.split(' ')[0] === 'JWT') {
-    jwt.verify(req.headers.authorization.split(' ')[1], process.env.API_SECRET, function (err, decode) {
-      if (err) req.user = undefined;
-      User.findOne({
-          _id: decode.id
-        })
-        .exec((err, user) => {
-          if (err) {
-            res.status(500)
-              .send({
-                message: err
-              });
-          } else {
-            req.user = user;
-            next();
-          }
-        })
-    });
-  } else {
-    req.user = undefined;
-    next();
+const verifyToken = async (req, res, next) => {
+  try {
+    if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'JWT') {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.API_SECRET);
+
+      const user = await User.findOne({ _id: decoded.id });
+
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      req.user = user;
+      next();
+    } else {
+      req.user = undefined;
+      next();
+    }
+  } catch (error) {
+    // Handle JWT verification errors or other exceptions
+    console.error("Error in verifyToken middleware:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 module.exports = verifyToken;
